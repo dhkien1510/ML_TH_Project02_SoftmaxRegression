@@ -6,14 +6,19 @@ const ctx = canvas.getContext("2d");
 
 let drawing = false;
 
-// Set drawing style
 ctx.lineWidth = 20;
 ctx.lineCap = "round";
 ctx.strokeStyle = "black";
 
 canvas.addEventListener("mousedown", () => (drawing = true));
-canvas.addEventListener("mouseup", () => (drawing = false));
-canvas.addEventListener("mouseleave", () => (drawing = false));
+canvas.addEventListener("mouseup", () => {
+    drawing = false;
+    ctx.beginPath();
+});
+canvas.addEventListener("mouseleave", () => {
+    drawing = false;
+    ctx.beginPath();
+});
 
 canvas.addEventListener("mousemove", (e) => {
     if (!drawing) return;
@@ -24,7 +29,7 @@ canvas.addEventListener("mousemove", (e) => {
     ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
 });
 
-// Clear button
+// Clear
 document.getElementById("clearBtn").addEventListener("click", () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.beginPath();
@@ -51,50 +56,44 @@ uploadInput.addEventListener("change", function () {
 
 
 // ---------------------------
-// Replace this with trained model
+// Send base64 image to backend
 // ---------------------------
-function SoftmaxPredict(imageData) {
-  // Generate 10 random probabilities
+async function sendImageToBackend(base64Image) {
+    const res = await fetch("http://localhost:5000/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64Image })
+    });
 
-    let probs = Array.from({ length: 10 }, () => Math.random());
-    let sum = probs.reduce((a, b) => a + b, 0);
-    probs = probs.map((p) => p / sum);
-
-    return probs;
+    return await res.json();
 }
 
 
 // ---------------------------
 // Predict from Canvas
 // ---------------------------
-document.getElementById("predictDrawBtn").addEventListener("click", () => {
-    const imageData = ctx.getImageData(0, 0, 280, 280);
-    const probs = SoftmaxPredict(imageData);
+document.getElementById("predictDrawBtn").addEventListener("click", async () => {
+    const base64 = canvas.toDataURL("image/png"); // convert to base64
 
-    const predictedDigit = probs.indexOf(Math.max(...probs));
-    displayPrediction(predictedDigit, probs);
+    const result = await sendImageToBackend(base64);
+
+    displayPrediction(result.predicted_class, result.probabilities);
 });
 
 
 // ---------------------------
 // Predict from Uploaded Image
 // ---------------------------
-document.getElementById("predictUploadBtn").addEventListener("click", () => {
+document.getElementById("predictUploadBtn").addEventListener("click", async () => {
     if (previewImage.classList.contains("d-none")) return;
 
-    // Create temp canvas to extract pixel data
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = 280;
-    tempCanvas.height = 280;
-    const tctx = tempCanvas.getContext("2d");
+    const base64 = previewImage.src; // already base64 from reader
 
-    tctx.drawImage(previewImage, 0, 0, 280, 280);
-    const imageData = tctx.getImageData(0, 0, 280, 280);
+    const result = await sendImageToBackend(base64);
 
-    const probs = SoftmaxPredict(imageData);
-    const predictedDigit = probs.indexOf(Math.max(...probs));
+    console.log(result);
 
-    displayPrediction(predictedDigit, probs);
+    displayPrediction(result.predicted_class, result.probabilities);
 });
 
 
@@ -105,7 +104,7 @@ let chartInstance = null;
 
 function displayPrediction(digit, probabilities) {
     document.getElementById("resultDigit").textContent = digit;
-
+    
     const ctxChart = document.getElementById("probChart").getContext("2d");
 
     if (chartInstance) chartInstance.destroy();
@@ -113,18 +112,18 @@ function displayPrediction(digit, probabilities) {
     chartInstance = new Chart(ctxChart, {
         type: "bar",
         data: {
-        labels: ["0","1","2","3","4","5","6","7","8","9"],
-        datasets: [
-            {
-            label: "Probability",
-            data: probabilities,
-            },
-        ],
+            labels: ["0","1","2","3","4","5","6","7","8","9"],
+            datasets: [
+                {
+                    label: "Probability",
+                    data: probabilities,
+                },
+            ],
         },
         options: {
-        scales: {
-            y: { beginAtZero: true }
-        }
+            scales: {
+                y: { beginAtZero: true }
+            }
         }
     });
 }
