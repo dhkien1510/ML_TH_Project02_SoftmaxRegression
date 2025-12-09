@@ -8,7 +8,7 @@ let drawing = false;
 
 ctx.lineWidth = 20;
 ctx.lineCap = "round";
-ctx.strokeStyle = "black";
+ctx.strokeStyle = "white";
 
 canvas.addEventListener("mousedown", () => (drawing = true));
 canvas.addEventListener("mouseup", () => {

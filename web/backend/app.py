@@ -6,6 +6,7 @@ import base64
 from PIL import Image
 from flask_cors import CORS
 import io
+import json
 
 app = Flask(__name__)
 CORS(app) 
@@ -13,32 +14,26 @@ CORS(app)
 # Load trained model
 with open('best_model.pkl', 'rb') as f:
     model = pickle.load(f)
-
-
+    
 # -----------------------------
 # Convert base64 → 28x28 features
 # -----------------------------
 
 def convert_image_to_features(base64_str):
-    # Decode base64 → image bytes
+    # Decode base64 → bytes
     img_bytes = base64.b64decode(base64_str.split(",")[1])
-    
-    # Read image
-    img = Image.open(io.BytesIO(img_bytes)).convert("L")  # convert to grayscale
+    img = Image.open(io.BytesIO(img_bytes)).convert("L")
 
-    # Resize to MNIST size
-    img = img.resize((28, 28))
+    # Resize xuống 14×14 = 196 pixel
+    img = img.resize((14, 14))
 
-    # Convert image to numpy array
-    arr = np.array(img)
+    arr = np.array(img) / 255.0
+    arr = arr.reshape(-1)  # → (196,)
 
-    # Normalize (0–255 → 0–1)
-    arr = arr / 255.0
+    # Add bias feature → thành 197
+    arr = np.append(arr, 1.0)
 
-    # Flatten → 784 features
-    features = arr.reshape(-1)
-
-    return features
+    return arr
 
 # -----------------------------
 # Predict API
@@ -65,6 +60,13 @@ def predict():
         pred = model.predict([features])[0]
         prob = model.predict_proba([features])[0]
 
+        print(json.dumps({
+            "success": True,
+            "predicted_class": int(pred),
+            "probabilities": prob.tolist(),
+            "confidence": float(np.max(prob))
+        }, indent=4))
+        
         return jsonify({
             "success": True,
             "predicted_class": int(pred),
